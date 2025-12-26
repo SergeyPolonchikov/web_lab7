@@ -1,4 +1,3 @@
-// Файл orderValidator.js
 class OrderValidator {
     constructor() {
         this.notificationContainer = null;
@@ -9,7 +8,6 @@ class OrderValidator {
     init() {
         this.createNotificationContainer();
         this.setupFormValidation();
-        this.disableBrowserValidation();
         this.isInitialized = true;
         
         console.log('OrderValidator initialized');
@@ -27,19 +25,10 @@ class OrderValidator {
         document.body.appendChild(this.notificationContainer);
     }
     
-    disableBrowserValidation() {
-        const orderForm = document.querySelector('.order-form');
-        if (orderForm) {
-            // Отключаем браузерную валидацию
-            orderForm.setAttribute('novalidate', 'novalidate');
-        }
-    }
-    
     setupFormValidation() {
-        const orderForm = document.querySelector('.order-form');
         const submitBtn = document.querySelector('.submit-btn');
         
-        if (orderForm && submitBtn) {
+        if (submitBtn) {
             // Удаляем старые обработчики
             const newSubmitBtn = submitBtn.cloneNode(true);
             submitBtn.parentNode.replaceChild(newSubmitBtn, submitBtn);
@@ -51,7 +40,11 @@ class OrderValidator {
             
             console.log('Form validation setup complete');
         } else {
-            console.error('Form or submit button not found');
+            console.error('Submit button not found');
+            // Попробуем найти кнопку позже
+            setTimeout(() => {
+                this.setupFormValidation();
+            }, 500);
         }
     }
     
@@ -160,7 +153,7 @@ class OrderValidator {
         if (errors.length > 0) {
             return {
                 isValid: false,
-                message: `Заполните следующие поля:<br><ul class="error-list">${errors.map(error => `<li>${error}</li>`).join('')}</ul>`
+                message: `Заполните следующие поля:<br>${errors.map(error => `${error}<br>`).join('')}`
             };
         }
         
@@ -182,7 +175,7 @@ class OrderValidator {
         
         console.log('Combo check - hasSoup:', hasSoup, 'hasMain:', hasMain, 'hasSalad:', hasSalad, 'hasDrink:', hasDrink, 'hasDessert:', hasDessert);
         
-        // Проверяем, что выбрано хотя бы одно блюдо
+        // 1. Проверяем, что выбрано хотя бы одно блюдо
         if (!hasSoup && !hasMain && !hasSalad && !hasDrink && !hasDessert) {
             console.log('Validation failed: Nothing selected');
             return {
@@ -191,7 +184,16 @@ class OrderValidator {
             };
         }
         
-        // Проверяем обязательный напиток
+        // 2. Проверяем наличие главного блюда (первый приоритет)
+        if (!hasMain) {
+            console.log('Validation failed: No main dish');
+            return {
+                isValid: false,
+                message: 'Выберите главное блюдо'
+            };
+        }
+        
+        // 3. Проверяем обязательный напиток (второй приоритет)
         if (!hasDrink) {
             console.log('Validation failed: No drink selected');
             return {
@@ -200,60 +202,20 @@ class OrderValidator {
             };
         }
         
-        // Проверяем варианты комбо из бизнес-ланчей
-        const combo1 = hasSoup && hasMain && hasSalad && hasDrink;      // Полный обед
-        const combo2 = hasSoup && hasMain && hasDrink;                  // Классический
-        const combo3 = hasSoup && hasSalad && hasDrink;                 // Легкий
-        const combo4 = hasMain && hasSalad && hasDrink;                 // Сытный
-        const combo5 = hasMain && hasDrink;                             // Базовый
-        
-        const isValidCombo = combo1 || combo2 || combo3 || combo4 || combo5;
-        
-        console.log('Combo validation result:', isValidCombo);
-        
-        if (!isValidCombo) {
-            if (!hasMain && !hasSalad) {
-                console.log('Validation failed: No main dish or salad');
-                return {
-                    isValid: false,
-                    message: 'Выберите главное блюдо или салат'
-                };
-            } else if (!hasSoup && !hasMain) {
-                console.log('Validation failed: No soup or main dish');
-                return {
-                    isValid: false,
-                    message: 'Выберите суп или главное блюдо'
-                };
-            } else if (!hasMain) {
-                console.log('Validation failed: No main dish');
-                return {
-                    isValid: false,
-                    message: 'Выберите главное блюдо'
-                };
-            }
-        }
-        
         console.log('Validation passed: Valid combo selected');
         return { isValid: true };
     }
     
     submitForm() {
         console.log('Preparing to submit form');
-        const form = document.querySelector('.order-form');
-        
-        if (!form) {
-            console.error('Form not found');
-            this.showNotification('Ошибка формы. Пожалуйста, обновите страницу.', 'error');
-            return;
-        }
         
         // Собираем данные формы для отображения в уведомлении
         const orderSummary = this.getOrderSummary();
         
         // Показываем подтверждение заказа
         this.showOrderConfirmation(orderSummary, () => {
-            // После подтверждения отправляем форму
-            this.actuallySubmitForm(form);
+            // После подтверждения симулируем отправку и показываем успех
+            this.simulateFormSubmission();
         });
     }
     
@@ -271,25 +233,56 @@ class OrderValidator {
             dessert: 'Десерт'
         };
         
-        let summary = '<h4>Детали заказа:</h4>';
+        let summary = '<div style="text-align: left; margin-bottom: 20px;">';
+        summary += '<h4 style="color: #2c3e50; margin-bottom: 15px; text-align: center;">Детали заказа:</h4>';
         
+        // Показываем только выбранные блюда
+        let hasSelectedDishes = false;
         Object.entries(selectedDishes).forEach(([category, dish]) => {
             if (dish) {
+                hasSelectedDishes = true;
                 summary += `<p><strong>${categoryNames[category]}:</strong> ${dish.name} - ${dish.price} руб.</p>`;
             }
         });
         
-        summary += `<p><strong>Итого:</strong> ${total} руб.</p>`;
+        if (hasSelectedDishes) {
+            summary += `<p style="font-weight: bold; margin-top: 15px;"><strong>Итого:</strong> ${total} руб.</p>`;
+        } else {
+            summary += '<p>Нет выбранных блюд</p>';
+        }
+        summary += '</div>';
         
         // Добавляем данные клиента
         const name = document.getElementById('name').value;
         const address = document.getElementById('address').value;
         const phone = document.getElementById('phone').value;
+        const email = document.getElementById('email').value;
+        const comment = document.getElementById('comment').value;
         
-        summary += `<hr><h4>Данные клиента:</h4>`;
+        summary += '<hr style="margin: 20px 0;">';
+        summary += '<div style="text-align: left;">';
+        summary += '<h4 style="color: #2c3e50; margin-bottom: 15px; text-align: center;">Данные клиента:</h4>';
         summary += `<p><strong>Имя:</strong> ${name}</p>`;
-        summary += `<p><strong>Адрес:</strong> ${address}</p>`;
+        summary += `<p><strong>Email:</strong> ${email}</p>`;
         summary += `<p><strong>Телефон:</strong> ${phone}</p>`;
+        summary += `<p><strong>Адрес:</strong> ${address}</p>`;
+        
+        // Добавляем время доставки
+        const deliveryTime = document.querySelector('input[name="delivery_time"]:checked');
+        if (deliveryTime) {
+            if (deliveryTime.value === 'soon') {
+                summary += `<p><strong>Время доставки:</strong> Как можно скорее</p>`;
+            } else if (deliveryTime.value === 'specific') {
+                const specificTime = document.getElementById('delivery-time-input').value;
+                summary += `<p><strong>Время доставки:</strong> ${specificTime}</p>`;
+            }
+        }
+        
+        // Добавляем комментарий если есть
+        if (comment.trim()) {
+            summary += `<p><strong>Комментарий:</strong> ${comment}</p>`;
+        }
+        summary += '</div>';
         
         return summary;
     }
@@ -300,13 +293,13 @@ class OrderValidator {
         notification.innerHTML = `
             <div class="notification-content">
                 <h3>Подтверждение заказа</h3>
-                <div class="order-summary-details">
+                <div class="order-summary-details" style="max-height: 300px; overflow-y: auto; padding: 10px; background: #f8f9fa; border-radius: 8px; margin: 15px 0;">
                     ${orderSummary}
                 </div>
-                <p>Всё верно?</p>
-                <div class="confirmation-buttons">
-                    <button class="notification-cancel-btn">Изменить</button>
-                    <button class="notification-confirm-btn">Подтвердить заказ</button>
+                <p style="margin: 20px 0; font-weight: bold; text-align: center;">Всё верно?</p>
+                <div class="confirmation-buttons" style="display: flex; gap: 15px; justify-content: center;">
+                    <button class="notification-cancel-btn" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">Изменить</button>
+                    <button class="notification-confirm-btn" style="padding: 10px 20px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">Подтвердить заказ</button>
                 </div>
             </div>
             <div class="notification-overlay"></div>
@@ -334,35 +327,46 @@ class OrderValidator {
         });
     }
     
-    actuallySubmitForm(form) {
-        console.log('Submitting form to httpbin');
+    simulateFormSubmission() {
+        console.log('Simulating form submission');
         
-        // Собираем данные формы
-        const formData = new FormData(form);
+        // Имитируем загрузку
+        const loadingNotification = document.createElement('div');
+        loadingNotification.className = 'notification loading';
+        loadingNotification.innerHTML = `
+            <div class="notification-content">
+                <h3>Отправка заказа...</h3>
+                <p>Пожалуйста, подождите</p>
+                <div class="loading-spinner" style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin: 20px auto;"></div>
+            </div>
+            <div class="notification-overlay"></div>
+        `;
         
-        // Добавляем данные о выбранных блюдах
-        const selectedDishes = orderManager.getSelectedDishes();
-        Object.entries(selectedDishes).forEach(([category, dish]) => {
-            if (dish) {
-                formData.append(`selected_${category}`, dish.name);
-                formData.append(`selected_${category}_price`, dish.price.toString());
-            }
-        });
+        this.showCustomNotification(loadingNotification);
         
-        // Отправляем форму
-        fetch(form.action, {
-            method: form.method,
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log('Form submitted successfully:', data);
+        // Добавляем стили для спиннера
+        if (!document.querySelector('#loading-spinner-styles')) {
+            const style = document.createElement('style');
+            style.id = 'loading-spinner-styles';
+            style.textContent = `
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        // Имитируем задержку отправки
+        setTimeout(() => {
+            this.hideNotification(loadingNotification);
             this.showSuccessNotification();
-        })
-        .catch(error => {
-            console.error('Form submission error:', error);
-            this.showNotification('Произошла ошибка при отправке заказа. Пожалуйста, попробуйте еще раз.', 'error');
-        });
+            
+            // Сбрасываем форму после успешной отправки
+            setTimeout(() => {
+                this.resetForm();
+            }, 100);
+        }, 1500);
     }
     
     showSuccessNotification() {
@@ -376,12 +380,64 @@ class OrderValidator {
                     <p>Мы свяжемся с вами для подтверждения заказа.</p>
                     <p>Спасибо, что выбрали наш сервис!</p>
                 </div>
-                <button class="notification-ok-btn">Отлично</button>
+                <button class="notification-ok-btn" style="margin-top: 15px;">Отлично</button>
             </div>
             <div class="notification-overlay"></div>
         `;
         
         this.showCustomNotification(notification);
+        
+        // Обработчик кнопки "Отлично"
+        const okBtn = notification.querySelector('.notification-ok-btn');
+        okBtn.addEventListener('click', () => {
+            this.hideNotification(notification);
+        });
+        
+        // Также закрываем через 5 секунд автоматически
+        setTimeout(() => {
+            if (notification.parentNode) {
+                this.hideNotification(notification);
+            }
+        }, 5000);
+    }
+    
+    resetForm() {
+        console.log('Resetting form...');
+        
+        // Только сбрасываем личные данные, НЕ трогаем выпадающие списки с блюдами
+        // OrderManager сам сбросит выбранные блюда через свой resetOrder()
+        
+        // Сбрасываем форму через OrderManager (он сбросит только выбранные блюда)
+        if (typeof orderManager !== 'undefined' && orderManager.resetOrder) {
+            orderManager.resetOrder();
+        }
+        
+        // Сбрасываем только личные данные, НЕ выпадающие списки с блюдами
+        const form = document.querySelector('.order-form-container');
+        if (form) {
+            // Только текстовые поля, email, телефон, textarea
+            const inputs = form.querySelectorAll('input[type="text"]:not([id*="soup"]):not([id*="salad"]):not([id*="main"]):not([id*="drink"]):not([id*="dessert"]), input[type="email"], input[type="tel"], textarea');
+            inputs.forEach(input => {
+                input.value = '';
+            });
+            
+            // Сбрасываем радио-кнопки
+            const radios = form.querySelectorAll('input[type="radio"]');
+            radios.forEach(radio => {
+                radio.checked = false;
+            });
+            
+            // Устанавливаем чекбокс по умолчанию
+            const newsletter = document.getElementById('newsletter');
+            if (newsletter) {
+                newsletter.checked = true;
+            }
+            
+            // НЕ сбрасываем select'ы с блюдами - они управляются через OrderManager
+            // Не трогаем: soup, salad, main-course, drink, dessert
+        }
+        
+        console.log('Form reset complete - personal data cleared, dishes remain managed by OrderManager');
     }
     
     showNotification(message, type = 'error') {
@@ -421,7 +477,7 @@ class OrderValidator {
     }
     
     setupNotificationCloseHandlers(notification) {
-        // Кнопка "Окей"
+        // Кнопка "Окей" (если есть)
         const okBtn = notification.querySelector('.notification-ok-btn');
         if (okBtn) {
             okBtn.addEventListener('click', () => {
@@ -473,5 +529,5 @@ document.addEventListener('DOMContentLoaded', () => {
         
         console.log('OrderValidator initialized successfully');
         console.log('System ready - form validation is active');
-    }, 500);
+    }, 1000);
 });
